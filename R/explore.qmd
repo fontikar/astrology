@@ -6,7 +6,7 @@ format: html
 ### Load dependencies
 
 ```{r}
-pak::pkg_install("wordcloud")
+# pak::pkg_install("wordcloud")
 
 pacman::p_load(tidymodels, tidytext, textdata, here, tidyverse, skimr, wordcloud, wordcloud2)
 ```
@@ -46,8 +46,8 @@ nrow(horoscope_by_word)
 
 ```{r}
 word_freq <- horoscope_by_word |>
-    count(sign, word) |>
-    bind_tf_idf(word, sign, n)
+  count(sign, word) |>
+  bind_tf_idf(word, sign, n)
 ```
 
 ### Retrieve sentiments for each word
@@ -56,33 +56,88 @@ word_freq <- horoscope_by_word |>
 nrc <- get_sentiments("nrc")
 
 horoscope_with_sent <- horoscope_by_word |>
-    inner_join(nrc)
+  inner_join(nrc)
 ```
 
 ### Exploratory plots
 
 #### Word clouds by sign
 
+#### Adjusting graphics parameters
+
+```{r}
+original_mai <- par()$mai
+
+par(mai = c(rep(0.5, 4)))
+par(mai = original_mai)
+
+original_mar <- par()$mar
+par(mar = c(0,0,0,0))
+par(mai = original_mar)
+```
+
 Not sure why the word cloud is cropped
 
 ```{r}
-# Function to create word cloud
+#' Function to create word cloud
 
-plot_word_cloud_by_sign <- function(word_freq, sign, colours = brewer.pal(8, "Dark2"), ...){
-    sign_data <- word_freq |> 
-    filter(sign == sign) 
+plot_word_cloud_by_sign <- function(word_freq, 
+                                    sign, 
+                                    colours = brewer.pal(8, "Dark2"), 
+                                    save = FALSE,
+                                    out_dir = "output/",
+                                    ...){
+  # Filter data to sign
+  sign_data <- word_freq |> 
+    dplyr::filter(sign == sign)
 
-wordcloud(words = sign_data$word, 
-          freq = sign_data$n, 
-          min.freq = 1,           # Minimum frequency to display a word
-          max.words = 100,        # Maximum number of words to display
-          random.order = FALSE,   # Arrange words from highest to lowest frequency
-          colors = colours, # Color palette
-          ...)  
+  # browser()
+  
+  if(save == TRUE){
+    
+     if(!dir.exists(out_dir))
+       dir.create(out_dir)
+  
+  png(paste0(out_dir, sign, "_wordcloud.png"))
+  
+  wordcloud(words = sign_data$word, 
+            freq = sign_data$n, 
+            min.freq = 1,           # Minimum frequency to display a word
+            max.words = 100,        # Maximum number of words to display
+            random.order = FALSE,   # Arrange words from highest to lowest frequency
+            colors = colours, # Color palette
+            ...)
+  
+  dev.off()
+  } else( 
+     wordcloud(words = sign_data$word, 
+            freq = sign_data$n, 
+            min.freq = 1,           # Minimum frequency to display a word
+            max.words = 100,        # Maximum number of words to display
+            random.order = FALSE,   # Arrange words from highest to lowest frequency
+            colors = colours, # Color palette
+            ...)
+  )
+
 }
 
-# Exclude "time" seems to come up a lot
+# Exclude "time" seems to come up a lot for all signs
+# Test this out for one sign
 word_freq |>
-    filter(!word == "time") |>
-    plot_word_cloud_by_sign(sign = "cancer")
+  filter(!word == "time") |>
+  plot_word_cloud_by_sign(sign = "cancer", scale = c(1.5,0.3), save = TRUE)
+
+
+# Iterate over signs
+word_freq_by_sign_list <- word_freq |>
+  dplyr::filter(!word == "time") |> 
+  split(~sign)
+
+
+walk(word_freq_by_sign_list,
+     ~plot_word_cloud_by_sign(.x, sign = unique(.x$sign), scale = c(1.5,0.3), save = TRUE)) 
 ```
+  
+
+
+
