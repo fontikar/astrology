@@ -1,0 +1,88 @@
+---
+title: "Can you predict astrology signs based on horoscope?"
+format: html
+---
+
+### Load dependencies
+
+```{r}
+pak::pkg_install("wordcloud")
+
+pacman::p_load(tidymodels, tidytext, textdata, here, tidyverse, skimr, wordcloud, wordcloud2)
+```
+
+### Have a quick look at the data
+
+I assume `sign` corresponds to the `description`, looking at `date_range` this seems to confirm this.
+
+```{r}
+horoscope <- read_csv(here("data/horoscope.csv"))
+
+skim(horoscope)
+glimpse(horoscope)
+```
+
+### Tokenising and removing stop words
+
+```{r}
+data(stop_words)
+
+horoscope_by_word <- horoscope |> 
+  unnest_tokens(word, description) |>
+  anti_join(stop_words)
+
+
+horoscope |> 
+  unnest_tokens(word, description) |> 
+  nrow()
+
+nrow(horoscope_by_word)
+```
+
+### Bind in term frequencies 
+
+- Term frequencies (TF) to see how often words appear
+- TF-IDF (Term Frequency-Inverse Document Frequency) to give more weight to rarer words that may be more meaningful. 
+
+```{r}
+word_freq <- horoscope_by_word |>
+    count(sign, word) |>
+    bind_tf_idf(word, sign, n)
+```
+
+### Retrieve sentiments for each word
+
+```{r}
+nrc <- get_sentiments("nrc")
+
+horoscope_with_sent <- horoscope_by_word |>
+    inner_join(nrc)
+```
+
+### Exploratory plots
+
+#### Word clouds by sign
+
+Not sure why the word cloud is cropped
+
+```{r}
+# Function to create word cloud
+
+plot_word_cloud_by_sign <- function(word_freq, sign, colours = brewer.pal(8, "Dark2"), ...){
+    sign_data <- word_freq |> 
+    filter(sign == sign) 
+
+wordcloud(words = sign_data$word, 
+          freq = sign_data$n, 
+          min.freq = 1,           # Minimum frequency to display a word
+          max.words = 100,        # Maximum number of words to display
+          random.order = FALSE,   # Arrange words from highest to lowest frequency
+          colors = colours, # Color palette
+          ...)  
+}
+
+# Exclude "time" seems to come up a lot
+word_freq |>
+    filter(!word == "time") |>
+    plot_word_cloud_by_sign(sign = "cancer")
+```
